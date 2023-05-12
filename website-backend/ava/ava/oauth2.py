@@ -28,8 +28,7 @@ class OAuth2Backend:
 
         # find user with same email address
         try:
-            user = User.objects.get(email=unverified_payload.get('email'))
-            return user
+            return User.objects.get(email=unverified_payload.get('email'))
         except:
             return None
 
@@ -67,13 +66,15 @@ def get_oauth2(request):
     # TODO Confirm anti-forgery state token in state.get('security_token'), if there is a problem, return 401
 
     # 4. Exchange code for access token and ID token
-    body = '&'.join([
-        'code='+get_code,
-        'client_id='+AUTH_CLIENT_ID,
-        'client_secret='+AUTH_CLIENT_SECRET,
-        'redirect_uri=' + AUTH_REDIRECT_URI,
-        'grant_type=authorization_code'
-    ])
+    body = '&'.join(
+        [
+            f'code={get_code}',
+            f'client_id={AUTH_CLIENT_ID}',
+            f'client_secret={AUTH_CLIENT_SECRET}',
+            f'redirect_uri={AUTH_REDIRECT_URI}',
+            'grant_type=authorization_code',
+        ]
+    )
     r = requests.post(AUTH_ENDPOINT, data=body, timeout=2)
     result_dict = r.json()
 
@@ -99,11 +100,11 @@ def get_oauth2(request):
     # Redirect user
     redirect_url = state.get('url')
     if state.get('anchor'):
-        redirect_url = redirect_url + '#' + state.get('anchor')
-    
+        redirect_url = f'{redirect_url}#' + state.get('anchor')
+
     # Generate new JWT Token for this user
     payload = jwt_payload_handler(user)
     token = jwt_encode_handler(payload)
 
-    redirect_url = redirect_url + '?token='+token+'&userid='+ user.username
+    redirect_url = f'{redirect_url}?token={token}&userid={user.username}'
     return redirect(redirect_url)

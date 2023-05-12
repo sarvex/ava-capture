@@ -69,8 +69,13 @@ class Session(models.Model):
         # if there is a StaticSsset associated with the neutral take, return its work folder, otherwise return the work folder of the Take
         if not self.session_neutral_take:
             return None
-        scan = apps.get_model(app_label='archive', model_name='StaticScanAsset').objects.all().filter(take=self.session_neutral_take)
-        if scan:
+        if (
+            scan := apps.get_model(
+                app_label='archive', model_name='StaticScanAsset'
+            )
+            .objects.all()
+            .filter(take=self.session_neutral_take)
+        ):
             return scan[0].work_folder
         return self.session_neutral_take.work_folder
 
@@ -81,10 +86,7 @@ class Session(models.Model):
             return None
         scan = apps.get_model(app_label='archive', model_name='StaticScanAsset').objects.all().filter(take=self.session_neutral_take)
         if scan and scan[0].has_tracking:
-            # If a scan exist for this take, use it to find the frame index corresponding to mixed_w
-            # TODO Note that we are using the first scan for the take, so only 1 scan per take is supported at this time for the neutral
-            framerate = self.session_neutral_take.frontal_framerate()
-            if framerate:
+            if framerate := self.session_neutral_take.frontal_framerate():
                 return int(scan[0].take_mixed_w_time * framerate)
 
         return 0
@@ -108,7 +110,7 @@ class Session(models.Model):
         return Take.objects.filter(shot__session=self).count()
 
     def full_name(self):
-        return '%s/%s' % (self.name, self.project.name)
+        return f'{self.name}/{self.project.name}'
 
     def __str__(self):
         return '#%d' % (self.id)
@@ -126,7 +128,7 @@ class Shot(models.Model):
         self.save()
 
     def full_name(self):
-        return '%s/%s' % (self.name, self.session.full_name())
+        return f'{self.name}/{self.session.full_name()}'
 
     def __str__(self):
         return '#%d' % (self.id)
@@ -156,10 +158,11 @@ class AddDependency():
     def job_success(self, model, dep_job_class):
         if self.allow:
             for c in dep_job_class.split('|'):
-                job_exists = model.ext_jobs.filter(job_class=c, status='success').exists()
-                if job_exists:
+                if job_exists := model.ext_jobs.filter(
+                    job_class=c, status='success'
+                ).exists():
                     return self
-            self.make_fail('Missing successful job %s for %s' % (dep_job_class,model) )
+            self.make_fail(f'Missing successful job {dep_job_class} for {model}')
         return self
     def condition(self, success, reason):
         if self.allow:
@@ -187,16 +190,13 @@ class Take(models.Model):
     colorspace = models.CharField(max_length=32, null=True, blank=True) # Linear16, raw, sRGB
 
     def get_allowed_actions(self):
-        # Returns list of jobs we can run on this asset
-        allowed_jobs = []
-        return allowed_jobs
+        return []
 
     def sorted_cameras(self):
         return self.cameras.all().order_by('unique_id')
 
     def frontal_framerate(self):
-        cam = self.cameras.filter(unique_id=self.shot.session.frontal_cam_id)
-        if cam:
+        if cam := self.cameras.filter(unique_id=self.shot.session.frontal_cam_id):
             return cam[0].framerate
         return None
 
@@ -211,7 +211,7 @@ class Take(models.Model):
         return self.cameras.all().aggregate(Sum('total_size'))['total_size__sum']
 
     def full_name(self):
-        return '%s/%s' % (self.name, self.shot.full_name())
+        return f'{self.name}/{self.shot.full_name()}'
 
     def __str__(self):
         return '#%d' % (self.id)
@@ -239,7 +239,7 @@ class Camera(models.Model):
     exposure_ms = models.FloatField(default=0.0)
 
     def full_name(self):
-        return '%s(%s)/%s' % (self.unique_id, self.model, self.take.full_name())
+        return f'{self.unique_id}({self.model})/{self.take.full_name()}'
 
     def __str__(self):
         return '#%d' % (self.id)
@@ -273,8 +273,7 @@ class StaticScanAsset(models.Model):
 
     def get_allowed_actions(self):
 
-        allowed_jobs = []
-        return allowed_jobs
+        return []
 
     def __str__(self):
         return '#%d-%s' % (self.id, self.name)
@@ -290,9 +289,7 @@ class TrackingAsset(models.Model):
     video_thumb = models.CharField(max_length=250, null=True, blank=True)
 
     def get_allowed_actions(self):
-        # Returns list of jobs we can run on this asset
-        allowed_jobs = []
-        return allowed_jobs
+        return []
 
     def __str__(self):
         return '#%d' % (self.id)

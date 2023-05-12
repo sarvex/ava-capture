@@ -45,7 +45,7 @@ class CameraSerializer(serializers.HyperlinkedModelSerializer):
 
             try:
 
-                filename = '%s_%s.jpg' % (uuid.uuid4(), data['unique_id'])
+                filename = f"{uuid.uuid4()}_{data['unique_id']}.jpg"
                 filepath = os.path.join(BASE_DIR, 'static', 'thumb', filename)
 
                 jpg_data = b64decode(b64_thumb)

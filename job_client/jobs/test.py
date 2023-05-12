@@ -22,9 +22,13 @@ class JobTestFixture(object):
         self.logger.setLevel(logging.DEBUG)
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
+
+
         class MockPipe(object):
             def send(self,str):
-                print('PIPE> %s' % str)
+                print(f'PIPE> {str}')
+
+
         self.pipe = MockPipe()
 
     def __call__(self, job, parameters):
@@ -77,7 +81,7 @@ class HttpTestJob(BaseJob):
     def __call__(self, parameters, pipe, log):
         r = self.server_get('/archive/archive_session/3/', json={'asdf':'asdf'})
         print(r.status_code)
-        if not r.status_code==200:
+        if r.status_code != 200:
             raise Exception('Status:%d Content:%s' % (r.status_code, r.content))
 
     class Meta(object):
@@ -87,12 +91,13 @@ class DummyJobWithChildren(BaseJob):
     def __call__(self, parameters, pipe, log):
         pipe.send('Begin DummyJobWithChildren')
 
-        child_launch_info = {}
-        child_launch_info['job_class'] = 'jobs.test.DummyJob'
-        child_launch_info['params'] = 'parameters'
-        child_launch_info['req_gpu'] = False
+        child_launch_info = {
+            'job_class': 'jobs.test.DummyJob',
+            'params': 'parameters',
+            'req_gpu': False,
+        }
         #child_launch_info['node_name'] = node_name
-        
+
         self.yieldToChildren([child_launch_info, child_launch_info, child_launch_info])
 
         # anything after yieldToChildren will not be executed
@@ -114,7 +119,6 @@ class DummyJobRaisingException(BaseJob):
         pipe.send('Before Exception')
         time.sleep(0.3)
         raise Exception('This job is raising an exception')
-        pipe.send('After Exception')
 
     class Meta(object):
         description = 'This is a test Job, which raises an Exception'
@@ -163,7 +167,7 @@ class DummyJobSubprocessCaptureOutput(BaseJob):
 
         (retcode, output) = self.run_subprocess(["ipconfig", "/all"], log)
 
-        if not retcode==0:
+        if retcode != 0:
             raise Exception('Expecting retcode=0')
 
     class Meta(object):

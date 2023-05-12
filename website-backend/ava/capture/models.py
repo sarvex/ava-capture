@@ -47,7 +47,7 @@ class LocationAccess(models.Model):
     write_access = models.BooleanField(default=False)
 
     def __str__(self):
-        return '%s/%s' % (self.user, self.location.name)
+        return f'{self.user}/{self.location.name}'
 
 class CaptureNode(models.Model):
     ip_address = models.CharField(max_length=200)
@@ -71,7 +71,7 @@ class CaptureNode(models.Model):
         return self.online and self.last_seen >= timezone.now() - datetime.timedelta(seconds=90)
 
     def __str__(self):
-        return '%s (%s)' % (self.machine_name, self.ip_address)
+        return f'{self.machine_name} ({self.ip_address})'
 
 class Camera(models.Model):
     node = models.ForeignKey(CaptureNode, on_delete=models.CASCADE, related_name='cameras')
@@ -89,4 +89,4 @@ class Camera(models.Model):
         return self.node.is_active()
 
     def __str__(self):
-        return '%s (%s) on %s' % (self.unique_id, self.model, self.node.machine_name)
+        return f'{self.unique_id} ({self.model}) on {self.node.machine_name}'

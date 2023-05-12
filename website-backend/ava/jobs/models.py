@@ -24,7 +24,7 @@ class FarmNodeGroup(models.Model):
     name = models.CharField(max_length=200)
 
     def __str__(self):
-        return '%s' % (self.name)
+        return f'{self.name}'
 
 class FarmNode(models.Model):
 
@@ -85,16 +85,25 @@ class FarmNode(models.Model):
         MINUTES_AFTER_STATE_CHANGE = 10
         MINUTES_AFTER_LAST_ACTIVITY = 10
 
-        if self.aws_instance_id and self.aws_auto_shutdown:
-            if self.aws_instance_state == 'running':
-                if (timezone.now() - self.aws_instance_state_changed) > datetime.timedelta(minutes=MINUTES_AFTER_STATE_CHANGE):
-                    if self.last_job_activity==None or (timezone.now() - self.last_job_activity) > datetime.timedelta(minutes=MINUTES_AFTER_LAST_ACTIVITY):
-                        if self.jobs.filter(Q(status='running')|Q(status='reserved')).count() == 0:
-                            return True
-        return False        
+        return bool(
+            self.aws_instance_id
+            and self.aws_auto_shutdown
+            and self.aws_instance_state == 'running'
+            and (timezone.now() - self.aws_instance_state_changed)
+            > datetime.timedelta(minutes=MINUTES_AFTER_STATE_CHANGE)
+            and (
+                self.last_job_activity is None
+                or (timezone.now() - self.last_job_activity)
+                > datetime.timedelta(minutes=MINUTES_AFTER_LAST_ACTIVITY)
+            )
+            and self.jobs.filter(
+                Q(status='running') | Q(status='reserved')
+            ).count()
+            == 0
+        )        
 
     def __str__(self):
-        return '%s' % (self.machine_name)
+        return f'{self.machine_name}'
 
     class Meta:
         ordering = ['machine_name']        
@@ -146,7 +155,7 @@ class FarmJob(ExportModelOperationsMixin('farmjob'), TimeStampedModel):
         return self.created_by == user.username or user.is_superuser
 
     def __str__(self):
-        return '#%s (%s) %s' % (self.id, self.job_class, self.status)
+        return f'#{self.id} ({self.job_class}) {self.status}'
 
     def get_absolute_url(self):
         return "/static/d/index.html#/app/job_details/%i" % self.id

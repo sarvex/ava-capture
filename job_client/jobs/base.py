@@ -53,7 +53,7 @@ class BaseJob(object):
 
         r = self.server_get(url)
 
-        if not r.status_code==200:
+        if r.status_code != 200:
             raise Exception('%s Status:%d Content:%s' % (url, r.status_code, r.content))
 
         return r.json()
@@ -91,7 +91,7 @@ class BaseJob(object):
         temp_filename = None
         with tempfile.NamedTemporaryFile(delete=False) as f:
             temp_filename = f.name
-            
+
             if timeout is None:
                 p = subprocess.Popen(cmd, stdout=f, stderr=f, cwd=cwd)
                 p.wait()
@@ -106,9 +106,9 @@ class BaseJob(object):
                 log.info(output)
         os.remove(temp_filename)
 
-        if check_output and not retcode==0:
+        if check_output and retcode != 0:
             raise subprocess.CalledProcessError(retcode, cmd, output)
-        
+
         return (retcode, output)
 
     def launch_job(self, job_class, node_name=None, params='', req_gpu=False, 
@@ -128,7 +128,7 @@ class BaseJob(object):
             }
         r = self.server_post('/jobs/farm_jobs/', json=d)
         if r.status_code != 201:
-            raise Exception('launch_job failed : ' + r.text)
+            raise Exception(f'launch_job failed : {r.text}')
 
         j = json.loads(r.content)
         job_id = int(j['id'])
@@ -140,7 +140,7 @@ class BaseJob(object):
                 }
             r = self.server_patch('/jobs/farm_jobs/%d/' % job_id, json=d)
             if r.status_code != 200:
-                raise Exception('job set dependencies failed : ' + r.text)
+                raise Exception(f'job set dependencies failed : {r.text}')
 
         # If there are tags, need to create job in two passes because of the ManyToMany relationship
         if tags:
@@ -149,7 +149,7 @@ class BaseJob(object):
                 }
             r = self.server_patch('/jobs/farm_jobs/%d/' % job_id, json=d)
             if r.status_code != 200:
-                raise Exception('job set tags failed : ' + r.text)
+                raise Exception(f'job set tags failed : {r.text}')
 
         if delayed_status:
             d = {
@@ -157,7 +157,7 @@ class BaseJob(object):
                 }
             r = self.server_patch('/jobs/farm_jobs/%d/' % job_id, json=d)
             if r.status_code != 200:
-                raise Exception('job set status failed : ' + r.text)
+                raise Exception(f'job set status failed : {r.text}')
 
         return job_id
 

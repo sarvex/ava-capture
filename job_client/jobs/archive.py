@@ -27,7 +27,7 @@ class DeleteFiles(BaseJob):
 
                 if os.path.exists(f):
 
-                    pipe.send('Delete %s' % f)
+                    pipe.send(f'Delete {f}')
 
                     # ED: Should this job fail if we cannot delete the files?
                     try:
@@ -43,9 +43,9 @@ class ExportTake(BaseJob):
 
         params = json.loads(parameters)
 
-        if not 'root_export_path' in params:
+        if 'root_export_path' not in params:
             raise Exception('Error in parameters, "root_export_path" not found')
-        if not 'nodes' in params:
+        if 'nodes' not in params:
             raise Exception('Error in parameters, "nodes" not found')
 
         child_to_launch = []
@@ -56,12 +56,12 @@ class ExportTake(BaseJob):
 
             child_params = {'file_list':file_list, 'root_export_path':params['root_export_path'], 'delete_source_files':True}
 
-            child_launch_info = {}
-            child_launch_info['job_class'] = 'jobs.archive.CopyFiles'
-            child_launch_info['params'] = json.dumps(child_params)
-            child_launch_info['node_name'] = node_name
-            child_launch_info['req_gpu'] = False
-
+            child_launch_info = {
+                'job_class': 'jobs.archive.CopyFiles',
+                'params': json.dumps(child_params),
+                'node_name': node_name,
+                'req_gpu': False,
+            }
             child_to_launch.append(child_launch_info)
 
         self.yieldToChildren(child_to_launch)
@@ -84,14 +84,16 @@ def safeCopyFile(src, dest, block_size=64*1024*1024, callback=None):
                 arr = fin.read(block_size)
 
 def nice_time(s):
-    hours = s // 3600 
+    hours = s // 3600
     minutes = (s-3600*hours) // 60
-    seconds = int(s-3600*hours-60*minutes)
     if hours>0:
         return '%d hours %d minutes' % (hours,minutes)
-    if minutes>0:
-        return '%d minutes %d seconds' % (minutes,seconds)
-    return '%d seconds' % seconds
+    seconds = int(s-3600*hours-60*minutes)
+    return (
+        '%d minutes %d seconds' % (minutes, seconds)
+        if minutes > 0
+        else '%d seconds' % seconds
+    )
 
 def nice_size(s):
     if s<1024:
@@ -110,11 +112,8 @@ def nice_size(s):
 
 class ProgressPercentage(object):
         def __init__(self, src, pipe):
-            if type(src) is list: 
-                self._filenames = src
-            else:
-                self._filenames = [src]
-            self._size = sum([self.safe_get_size(f) for f in self._filenames])
+            self._filenames = src if type(src) is list else [src]
+            self._size = sum(self.safe_get_size(f) for f in self._filenames)
             self._seen_so_far = 0
             self._lock = threading.Lock()
             self._start_time = time.time()
@@ -144,7 +143,7 @@ class ProgressPercentage(object):
                 # Compute estimated ETA
                 eta = ''
                 if copy_speed>0 and self._seen_so_far>0 and self._seen_so_far < self._size:
-                    eta = nice_time(max(self._size-self._seen_so_far,0)/copy_speed) + ' remaining'
+                    eta = f'{nice_time(max(self._size - self._seen_so_far, 0) / copy_speed)} remaining'
 
                 self._pipe.send('Copying [%d%%] File %d of %d (%s/s) %s' % (int(percent), self._file_index+1,len(self._filenames),nice_size(int(copy_speed)), eta))
 
@@ -169,42 +168,42 @@ class CopyFiles(BaseJob):
                 except:
                     pass
                 if not os.path.exists(dest):
-                    raise Exception('Cannot create folder %s' % dest)
+                    raise Exception(f'Cannot create folder {dest}')
 
                 dest_file = os.path.join(dest,os.path.split(src)[1])
-                log.info('Copy %s to %s' % (src, dest_file))
+                log.info(f'Copy {src} to {dest_file}')
 
                 # Check if file already exists and should be skipped
                 skip_file = False
                 if os.path.exists(dest_file) and not os.path.exists(src):
-                    log.info('Skip existing file: %s' % dest_file)
+                    log.info(f'Skip existing file: {dest_file}')
                     skip_file = True
 
                 if not skip_file:
                     if not os.path.exists(src):
-                        raise Exception('Source file does not exist: %s' % src)
+                        raise Exception(f'Source file does not exist: {src}')
 
                     file_size = os.path.getsize(src)
 
                     safeCopyFile(src, dest_file, callback=progress)
 
                     if not os.path.exists(dest_file):
-                        raise Exception('Destination file does not exist: %s' % dest_file)
-                    if not os.path.getsize(dest_file) == file_size:
-                        raise Exception('File size mismatch: %s' % dest_file)
+                        raise Exception(f'Destination file does not exist: {dest_file}')
+                    if os.path.getsize(dest_file) != file_size:
+                        raise Exception(f'File size mismatch: {dest_file}')
 
                 progress.next_file()
-                
+
             # Everything copied, delete source files
             if delete_src_files:
                 for src,dest in params['file_list']:
                     if os.path.exists(src):
-                        log.debug('Deleting %s' % src)
+                        log.debug(f'Deleting {src}')
                         try:
                             os.remove(src)
                         except:
-                            log.error('Could not delete %s' % src)
-        
+                            log.error(f'Could not delete {src}')
+
         log.info('Done')
 
     class Meta(object):

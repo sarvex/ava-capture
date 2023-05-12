@@ -20,6 +20,6 @@ module_list = ['archive','test']
 
 for module_name in module_list:
     try:
-        importlib.import_module('.'+module_name,__name__)
+        importlib.import_module(f'.{module_name}', __name__)
     except:
         print('Could not import %s\n%s' % (module_name, traceback.format_exc(limit=3)))

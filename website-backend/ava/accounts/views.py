@@ -69,20 +69,19 @@ def index(request):
 
 def info(request):
     if request.user.is_authenticated:
-        return HttpResponse("info about user (authenticated)" + request.user.username)
+        return HttpResponse(f"info about user (authenticated){request.user.username}")
     else:
-        return HttpResponse("info about user " + request.user.username)
+        return HttpResponse(f"info about user {request.user.username}")
 
 def login(request):
     if 'username' in request.POST and 'password' in request.POST:
         username = request.POST['username']
         password = request.POST['password']
         user = auth.authenticate(username=username, password=password)
-        if user is not None:
-            auth.login(request,user)
-            return HttpResponse("login ok " + request.user.username)
-        else:
+        if user is None:
             return HttpResponse("login error")
+        auth.login(request,user)
+        return HttpResponse(f"login ok {request.user.username}")
     else:
         # display login form
         template = Template('<html><body><form method="post" action="/accounts/login"><input type="text" name="username"><input type="password" name="password"><input type="submit" value="Login">{% csrf_token %}</form></body></html>')

@@ -4,8 +4,7 @@ import boto3
 REGIONS = ['us-east-1', 'us-west-1', 'us-west-2']
 
 def state_to_string(instance):
-    state = instance.get('State')
-    if state:
+    if state := instance.get('State'):
         code = state.get('Code', 0)
         name = state.get('Name', 'error')
         return '(%d) %s' % (code, name)
@@ -29,9 +28,9 @@ def instance_id_from_private_ip(private_ip):
                     instance_id = instance.get('InstanceId')
                     state = instance.get('State').get('Name')
                     return (instance_id, region, state)
-                
+
         except Exception as e:
-            print('AWS Error: ' + e.message)
+            print(f'AWS Error: {e.message}')
 
     return (None, None, 'none')
 
@@ -49,9 +48,9 @@ def instance_state(instance_id, region):
             for instance in reservation.get('Instances', []):
                 if instance_id == instance.get('InstanceId'):
                     return instance.get('State').get('Name')
-                
+
     except Exception as e:
-        print('AWS Error: ' + e.message)
+        print(f'AWS Error: {e.message}')
 
     return None
 

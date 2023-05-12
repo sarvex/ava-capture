@@ -84,7 +84,7 @@ def job_process(job_id, job_class, parameters, q, pipe, server_url, context, log
 
         # Console handler
         ch = logging.StreamHandler()
-        ch.setLevel(logging.INFO)        
+        ch.setLevel(logging.INFO)
         logger.addHandler(ch)
 
         # Log File Handler
@@ -97,7 +97,7 @@ def job_process(job_id, job_class, parameters, q, pipe, server_url, context, log
             logger.addHandler(handler)
             logger.info('Launching Job #%d' % job_id)
             if parameters:
-                logger.info('Parameters: %s' % parameters)
+                logger.info(f'Parameters: {parameters}')
 
         job = job_class()
         job.job_id = job_id
@@ -205,18 +205,17 @@ class JobInstance(object):
             if self.terminated:
                 # Job was terminated from user request
                 self.result = {'job_id':self.job_id, 'success':False, 'retcode':1, 'exception':'Terminated by server', 'progress':'terminated'}
-            else:
-                if q.empty():
-                    # Job process error, the job should always place its output in the queue
-                    self.result = {'job_id':self.job_id, 'success':False, 'retcode':1, 'exception':'Job process terminated abnormally', 'progress':'failed'}
-                else:                
-                    # Job terminated normally
-                    self.result = q.get()
-                    self.result['progress'] = self.status
+            elif q.empty():
+                # Job process error, the job should always place its output in the queue
+                self.result = {'job_id':self.job_id, 'success':False, 'retcode':1, 'exception':'Job process terminated abnormally', 'progress':'failed'}
+            else:                
+                # Job terminated normally
+                self.result = q.get()
+                self.result['progress'] = self.status
         except:
             print('Exception while gathering job output')
 
-        parent_conn.close()   
+        parent_conn.close()
         return self.result
 
 class JobContainer(object):
@@ -274,7 +273,7 @@ class JobClient(object):
 
     def __init__(self, server, git_version, tags):
 
-        print('Logs will be written to %s' % self.LOG_FOLDER)
+        print(f'Logs will be written to {self.LOG_FOLDER}')
 
         self.USERNAME = DEFAULT_USERNAME
         self.PASSWORD = DEFAULT_PASSWORD
@@ -327,7 +326,7 @@ class JobClient(object):
                     self.cuda_device_count = 0
         except:
             self.cuda_device_count = 0
-        
+
         if self.cuda_device_count > 0:
             self.tags.append('gpu')
         else:
@@ -335,22 +334,22 @@ class JobClient(object):
 
         self.tags.append('py%d%d' % (sys.version_info.major, sys.version_info.minor))
 
-        self.context = {}
-        self.context['user'] = {
-            'git_version': self.git_version,
-            'server': self.server,
-            'hostname': self.hostname,
-            'ip_address': self.ip,            
-            'cpu_brand' : self.info['brand'],
-            'cpu_cores' : self.info['count'],
-            'cuda_device_count' : self.cuda_device_count,
-            'client_tags' : self.tags            
+        self.context = {
+            'user': {
+                'git_version': self.git_version,
+                'server': self.server,
+                'hostname': self.hostname,
+                'ip_address': self.ip,
+                'cpu_brand': self.info['brand'],
+                'cpu_cores': self.info['count'],
+                'cuda_device_count': self.cuda_device_count,
+                'client_tags': self.tags,
+            },
+            'tags': {
+                'system': platform.system(),
+                'python_version': platform.python_version(),
+            },
         }
-        self.context['tags'] = {
-            'system' : platform.system(),
-            'python_version' : platform.python_version()
-        }
-
         self.container = JobContainer(self.log_folder, server, self.context)
 
         self.available_job_classes = create_available_job_list(self.logger)
@@ -362,7 +361,12 @@ class JobClient(object):
             'ip_address': self.ip,
             'status': 'offline'
             }
-        r = self.s.post('%s/jobs/client_discover/' % self.server, json=payload, auth=(self.USERNAME, self.PASSWORD), verify=False)
+        r = self.s.post(
+            f'{self.server}/jobs/client_discover/',
+            json=payload,
+            auth=(self.USERNAME, self.PASSWORD),
+            verify=False,
+        )
 
     def phone_home(self):
 
@@ -388,9 +392,14 @@ class JobClient(object):
             }
 
         for j in payload['finished_jobs']:
-            self.logger.info('Job Finished: %s' % (j))
+            self.logger.info(f'Job Finished: {j}')
 
-        r = self.s.post('%s/jobs/client_discover/' % self.server, json=payload, auth=(self.USERNAME, self.PASSWORD), verify=False)
+        r = self.s.post(
+            f'{self.server}/jobs/client_discover/',
+            json=payload,
+            auth=(self.USERNAME, self.PASSWORD),
+            verify=False,
+        )
         if (r.status_code==200):
 
             self.first_update = False
@@ -419,7 +428,7 @@ class JobClient(object):
                         self.container.terminate_job(job_id)                        
 
             except Exception as e:
-                self.logger.error('received invalid data from server. %s' % e)
+                self.logger.error(f'received invalid data from server. {e}')
         else:
             self.logger.error("Unexpected return code while contacting server %s (%d)" % (self.server, r.status_code))
             self.logger.error(r.text)
@@ -433,7 +442,7 @@ class JobClient(object):
                     self.phone_home()
 
                 except Exception as e:
-                    self.logger.error('Failed to contact server. %s' % e)
+                    self.logger.error(f'Failed to contact server. {e}')
 
                 if self.need_restart and not self.container.running_jobs and not self.container.finished_jobs:
                     print('Restarting...')
@@ -448,12 +457,16 @@ class JobClient(object):
         except KeyboardInterrupt:
             pass
         finally:
-           self.notify_exit()
+            self.notify_exit()
 
 class SingleInstance(object):
     def __init__(self, name):
         self.locked = False
-        self.lock_file = os.path.abspath(os.path.join(os.path.split(sys.modules[__name__].__file__)[0], name+'.lock'))
+        self.lock_file = os.path.abspath(
+            os.path.join(
+                os.path.split(sys.modules[__name__].__file__)[0], f'{name}.lock'
+            )
+        )
         if sys.platform == 'win32':
             # Windows
             self.fd = None
@@ -465,7 +478,7 @@ class SingleInstance(object):
             except OSError:
                 type, e, tb = sys.exc_info()
                 if e.errno == 13:
-                    raise Exception('Process %s Already Running' % name)
+                    raise Exception(f'Process {name} Already Running')
         else:
             # Linux
             import fcntl
@@ -475,7 +488,7 @@ class SingleInstance(object):
                 fcntl.lockf(self.fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 self.locked = True
             except IOError:
-                raise Exception('Process %s Already Running' % name)
+                raise Exception(f'Process {name} Already Running')
 
 
     def __del__(self):
@@ -510,10 +523,13 @@ def create_available_job_list(logger):
     for module_name in sys.modules:
         if module_name.split('.')[0]=='jobs':
             m = sys.modules[module_name]
-            for name, obj in inspect.getmembers(m):
-                if inspect.isclass(obj):
-                    if issubclass(obj, BaseJob) and name!='BaseJob':
-                        avalable_job_classes.append(obj)
+            avalable_job_classes.extend(
+                obj
+                for name, obj in inspect.getmembers(m)
+                if inspect.isclass(obj)
+                and issubclass(obj, BaseJob)
+                and name != 'BaseJob'
+            )
     # Instanciate each job and check requirements
     job_class_names = []
     for c in avalable_job_classes:
@@ -524,9 +540,9 @@ def create_available_job_list(logger):
             if "'" in class_name:
                 class_name = class_name.split("'")[1]
             job_class_names.append(class_name)
-            print(' OK %s' % c)
+            print(f' OK {c}')
         except Exception as e:
-            print(' Not Available: %s (%s)' % (c,str(e)))
+            print(f' Not Available: {c} ({str(e)})')
     return job_class_names
 
 if __name__ == "__main__":

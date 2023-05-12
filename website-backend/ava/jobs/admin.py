@@ -13,8 +13,9 @@ def aws_start_instance(modeladmin, request, queryset):
     nodes = queryset.exclude(aws_instance_id=None)
     for node in nodes:
         if node.aws_instance_id:
-            state = aws.start_instance(node.aws_instance_id, node.aws_instance_region)
-            if state:
+            if state := aws.start_instance(
+                node.aws_instance_id, node.aws_instance_region
+            ):
                 node.aws_instance_state = state
                 node.save()
 
@@ -22,8 +23,9 @@ def aws_stop_instance(modeladmin, request, queryset):
     nodes = queryset.exclude(aws_instance_id=None)
     for node in nodes:
         if node.aws_instance_id:
-            state = aws.stop_instance(node.aws_instance_id, node.aws_instance_region)
-            if state:
+            if state := aws.stop_instance(
+                node.aws_instance_id, node.aws_instance_region
+            ):
                 node.aws_instance_state = state
                 node.save()
 

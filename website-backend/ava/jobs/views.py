@@ -94,7 +94,7 @@ def job_mesh(request, job_id="0"):
         job.save()
 
     except Exception as e:
-        return JSONResponse({'message':'%s' % e}, status=500)
+        return JSONResponse({'message': f'{e}'}, status=500)
 
     return HttpResponse()
 
@@ -130,7 +130,7 @@ def job_output(request, job_id="0"):
                 except:
                     return JSONResponse({'content':data, 'length':len(data), 'status':job.status})
         except Exception as e:
-            return HttpResponse('Exception: %s' % e, status=404)
+            return HttpResponse(f'Exception: {e}', status=404)
 
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
@@ -161,7 +161,7 @@ def job_image(request, job_id="0"):
         job.save()
 
     except Exception as e:
-        return JSONResponse({'message':'%s' % e}, status=500)
+        return JSONResponse({'message': f'{e}'}, status=500)
 
     return HttpResponse()
 
@@ -182,7 +182,7 @@ def job_detailed(request, job_id="0"):
 @permission_classes((IsAuthenticated,))
 def post_aws_start_instance(request):
 
-    if not 'node_id' in request.data:
+    if 'node_id' not in request.data:
         return HttpResponse(status=500)
 
     node = FarmNode.objects.get(pk=request.data['node_id'])
@@ -192,8 +192,9 @@ def post_aws_start_instance(request):
         return HttpResponse(status=403)
 
     if node.aws_instance_id:
-        state = aws.start_instance(node.aws_instance_id, node.aws_instance_region)
-        if state:
+        if state := aws.start_instance(
+            node.aws_instance_id, node.aws_instance_region
+        ):
             node.aws_instance_state = state
             node.save()
 
@@ -203,7 +204,7 @@ def post_aws_start_instance(request):
 @permission_classes((IsAuthenticated,))
 def post_reload_client(request):
 
-    if not 'node_id' in request.data:
+    if 'node_id' not in request.data:
         return HttpResponse(status=500)
 
     if request.data['node_id']<0:
@@ -239,7 +240,7 @@ def on_job_restart(job_id):
 @permission_classes((IsAuthenticated,))
 def restart_job_failed_child(request):
 
-    if not 'job_id' in request.data:
+    if 'job_id' not in request.data:
         return HttpResponse(status=500)
 
     use_same_machine = request.data['use_same_machine'] if 'use_same_machine' in request.data else False
@@ -276,7 +277,7 @@ def restart_job_failed_child(request):
 @permission_classes((IsAuthenticated,))
 def restart_job(request):
 
-    if not 'job_id' in request.data:
+    if 'job_id' not in request.data:
         return HttpResponse(status=500)
 
     clone_job = request.data['clone_job'] if 'clone_job' in request.data else False
@@ -343,7 +344,7 @@ def restart_job(request):
 @permission_classes((IsAuthenticated,))
 def delete_job(request):
 
-    if not 'job_id' in request.data:
+    if 'job_id' not in request.data:
         return HttpResponse(status=500)
 
     # Find Job to be restarted
@@ -367,7 +368,7 @@ def delete_job(request):
 @permission_classes((IsAuthenticated,))
 def kill_job(request):
 
-    if not 'job_id' in request.data:
+    if 'job_id' not in request.data:
         return HttpResponse(status=500)
 
     # Find Job to be restarted
@@ -388,23 +389,24 @@ def kill_job(request):
     return HttpResponse(status=404)
  
 def UpdateParentJob(job, request):
-    if job.status=='waiting':
-        success_count = job.children.filter(status='success').count()
-        failed_count = job.children.filter(status='failed').count()
-        all_count = job.children.count()
+    if job.status != 'waiting':
+        return
+    success_count = job.children.filter(status='success').count()
+    failed_count = job.children.filter(status='failed').count()
+    all_count = job.children.count()
 
-        job.progress = '%d/%d Success, %d/%d Failed' % (success_count, all_count, failed_count, all_count)
+    job.progress = '%d/%d Success, %d/%d Failed' % (success_count, all_count, failed_count, all_count)
 
-        if all_count>0 and success_count+failed_count == all_count:
-            # If there are no child in a status that is not success or failed
-            previous_status = job.status
-            job.status = 'failed' if failed_count>0 else 'success'
-            if not job.status == previous_status:
-                g_logger.info('Job #%d status set to %s in UpdateParentJob' % (job.id, job.status))      
-                job.end_time = timezone.now()
-                onJobChanged(job, request)
+    if all_count>0 and success_count+failed_count == all_count:
+        # If there are no child in a status that is not success or failed
+        previous_status = job.status
+        job.status = 'failed' if failed_count>0 else 'success'
+        if job.status != previous_status:
+            g_logger.info('Job #%d status set to %s in UpdateParentJob' % (job.id, job.status))      
+            job.end_time = timezone.now()
+            onJobChanged(job, request)
 
-        job.save()
+    job.save()
 
 
 def sendEmailToOwner(job, request):
@@ -413,8 +415,7 @@ def sendEmailToOwner(job, request):
 
         recipients = [ADMIN_EMAIL]
 
-        user = User.objects.all().filter(username=job.created_by)
-        if user:
+        if user := User.objects.all().filter(username=job.created_by):
             recipients.append(user[0].email)
 
         url = request.build_absolute_uri(FRONTEND_URL + '/app/job_details/%d' % job.id)
@@ -436,29 +437,29 @@ def sendEmailToOwner(job, request):
 
 def slack_notification(message, color='good', extra_attributes={}):
     if SLACK_NOTIF_HOOK:
-        try:            
+        try:    
             # Slack channel
 
-            url = 'https://hooks.slack.com/services/%s' % SLACK_NOTIF_HOOK
+            url = f'https://hooks.slack.com/services/{SLACK_NOTIF_HOOK}'
 
             data_att = {"color": color, 'text':message, 'fallback':message}
-            data_att.update(extra_attributes)
+            data_att |= extra_attributes
             data_str = json.dumps( {'attachments': [data_att]} )
 
             headers = {'Content-Type': 'application/json', 'Content-Length': len(data_str)}
             requests.post(url, data=data_str, headers=headers)
 
         except Exception as e:
-            g_logger.error('Slack notification failed %s' % e)
+            g_logger.error(f'Slack notification failed {e}')
 
 def job_notification(job, request):
 
     # Send email notification if status is 'failed'
-    if job.status=='failed' and job.parent==None and NOTIFICATION_EMAIL:
+    if job.status == 'failed' and job.parent is None and NOTIFICATION_EMAIL:
         sendEmailToOwner(job, request)
 
     # Slack channel
-    if job.parent==None and not job.status=='waiting':
+    if job.parent is None and job.status != 'waiting':
 
         if job.status=='failed':
             color = 'danger'
@@ -466,7 +467,7 @@ def job_notification(job, request):
             color = 'good'
         else:
             color = 'warning'
-        
+
         notif_text = 'Job #%d %s: *%s* (%s)' % (job.id, job.job_class, job.status, job.created_by)
         if job.ext_take:
             notif_text += '\nTake: #%d %s' % (job.ext_take.id, job.ext_take.full_name())
@@ -496,14 +497,12 @@ def onJobChanged(job, request):
         UpdateParentJob(job.parent, request)
 
 def make_sure_node_exists(nodename):
-    nodes = FarmNode.objects.filter(machine_name__iexact=nodename)
-    if nodes:
+    if nodes := FarmNode.objects.filter(machine_name__iexact=nodename):
         return nodes[0]
-    else:
-        # Node does not exist, create it
-        node = FarmNode(machine_name=nodename)
-        node.save()
-        return node
+    # Node does not exist, create it
+    node = FarmNode(machine_name=nodename)
+    node.save()
+    return node
 
 def cleanup_dead_jobs(request):
     for lost_job in FarmJob.objects.filter(Q(status='running') | Q(status='terminating')).filter(node__last_seen__lt=timezone.now() - datetime.timedelta(hours=2)): # Jobs will timeout after 2h

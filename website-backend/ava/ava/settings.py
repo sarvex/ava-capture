@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/1.10/ref/settings/
 """
 
+
 import os
 import datetime
 import socket
@@ -234,7 +235,7 @@ if not secure_settings.PROD_SERVER: # DEV Server has a different way to serve st
 
     # This is a development server
     DEBUG = True
-    FRONTEND_URL = STATIC_URL + 'd/index.html#'
+    FRONTEND_URL = f'{STATIC_URL}d/index.html#'
     STATICFILES_DIRS = [
         ('thumb', os.path.abspath(os.path.join(BASE_DIR, r'static/thumb'))),
         ('d', os.path.abspath(os.path.join(BASE_DIR, r'dist-dev'))), # path set in docker run
@@ -245,7 +246,7 @@ if not secure_settings.PROD_SERVER: # DEV Server has a different way to serve st
             'NAME': os.path.join(BASE_DIR,'dev-database','sqlite3.db'),
         }
     }
-    
+
     LOGGING = {
         'version': 1,
         'disable_existing_loggers': False,

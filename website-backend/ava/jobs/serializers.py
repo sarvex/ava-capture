@@ -69,13 +69,15 @@ class FarmJobSerializer(TaggitSerializer, serializers.ModelSerializer):
     def create(self, validated_data):
         
         # Set priority from parent if it is not specified
-        if not 'priority' in validated_data and 'parent' in validated_data:
-            # If we didn't set a priority explicitely, and we have a parent, inherit the priority
-            if validated_data['parent']:
-                validated_data['priority'] = validated_data['parent'].priority
+        if (
+            'priority' not in validated_data
+            and 'parent' in validated_data
+            and validated_data['parent']
+        ):
+            validated_data['priority'] = validated_data['parent'].priority
 
         # Add created-by if it is missing
-        if not 'created_by' in validated_data:
+        if 'created_by' not in validated_data:
             validated_data['created_by'] = self.context['request'].user.username
 
         tags_data = validated_data.pop('tags') if 'tags' in validated_data else None
@@ -92,8 +94,7 @@ class FarmJobSerializer(TaggitSerializer, serializers.ModelSerializer):
         return obj.has_write_access(self.context['request'].user)
 
     def get_gravatar(self, obj):
-        user = User.objects.all().filter(username=obj.created_by)
-        if user:
+        if user := User.objects.all().filter(username=obj.created_by):
             return get_gravatar_url(user[0].email, size=50)
         return None
 

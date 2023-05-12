@@ -10,12 +10,10 @@ if os.path.exists(site_packages_path):
 import hardware_sync
 import avacapture
 
-# Initialize Arduino-based hardware sync
-port = hardware_sync.ArduinoHardWareSync.auto_detect_port()
-if port:
-	sync = hardware_sync.ArduinoHardWareSync(port)
-	if sync.ok:
-		avacapture.set_sync(sync)
+if port := hardware_sync.ArduinoHardWareSync.auto_detect_port():
+    sync = hardware_sync.ArduinoHardWareSync(port)
+    if sync.ok:
+    	avacapture.set_sync(sync)
 
 
 # Notification Listener will recieve events from avacapture

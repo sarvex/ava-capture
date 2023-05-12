@@ -107,7 +107,7 @@ def get_archive_json_file(request, session_id="0"):
 
     filename = 'exported_session_%d.json' % session_id
 
-    response['Content-Disposition'] = 'attachment; filename=%s' % filename
+    response['Content-Disposition'] = f'attachment; filename={filename}'
 
     return response
 
@@ -204,7 +204,7 @@ def post_delete_takes(request):
                     local_files_to_delete.append(full_thumb_path(take.video_thumb)) # delete thumbnail from server
 
                 for cam in take.cameras.all():
-                    
+
                     if cam.thumbnail_filename:
                         local_files_to_delete.append(full_thumb_path(cam.thumbnail_filename)) # delete thumbnail from server
 
@@ -225,9 +225,7 @@ def post_delete_takes(request):
             # Create jobs to delete local files on nodes, or exported files
             for key in remote_files_to_delete:
 
-                params = {}
-                params['files'] = remote_files_to_delete[key]
-                params['node'] = key
+                params = {'files': remote_files_to_delete[key], 'node': key}
                 params_json = json.dumps(params)
 
                 # Create Job
@@ -261,10 +259,15 @@ class ImagePacker():
         })
     def response(self):
         if not self.files:
-            return JSONResponse({'message':'No images received from ' + cam.machine_name}, status=500)
+            return JSONResponse(
+                {'message': f'No images received from {cam.machine_name}'},
+                status=500,
+            )
         elif len(self.files) == 1:
             response = HttpResponse(self.files[0].get('data'), content_type=self.files[0].get('content_type'))
-            response['Content-Disposition'] = 'attachment; filename="%s"' % self.files[0].get('filename')
+            response[
+                'Content-Disposition'
+            ] = f"""attachment; filename="{self.files[0].get('filename')}\""""
             return response
         else:
             buff = StringIO.StringIO()
@@ -273,7 +276,7 @@ class ImagePacker():
                 zip_archive.writestr(f['filename'], f['data'])
             zip_archive.close()
             response = HttpResponse(buff.getvalue(), content_type='compressed/zip')
-            response['Content-Disposition'] = 'attachment; filename="%s"' % self.zip_filename
+            response['Content-Disposition'] = f'attachment; filename="{self.zip_filename}"'
             return response
 
 @api_view(['GET'])
@@ -284,12 +287,14 @@ def download_original(request):
 
     take = Take.objects.get(pk=take_id)
 
-    # Look for this camera in the Take
-    cams = take.cameras.filter(unique_id=cam_uid)
-    if cams:
+    if cams := take.cameras.filter(unique_id=cam_uid):
         cam = cams[0] # Camera found
 
-        if take.frame_count() > 1 and not (take.is_burst or take.is_scan_burst):
+        if (
+            take.frame_count() > 1
+            and not take.is_burst
+            and not take.is_scan_burst
+        ):
             return JSONResponse({'message':'Download not supported for sequences'}, status=500)
 
         frame_index_list = [0]
@@ -298,7 +303,10 @@ def download_original(request):
         node = CaptureNode.objects.filter(machine_name=cam.machine_name)
         if not node:
             # Node not found in db
-            return JSONResponse({'message':'Capture node not found: ' + cam.machine_name}, status=500)
+            return JSONResponse(
+                {'message': f'Capture node not found: {cam.machine_name}'},
+                status=500,
+            )
 
         if take.is_burst or take.is_scan_burst:
             print('Downloading %d frames' % take.frame_count())
@@ -306,7 +314,7 @@ def download_original(request):
 
         # try to guess file extention from the all_files field on the camera
         extension = 'tif'
-        if not '.tif' in cam.all_files and '.raw' in cam.all_files:
+        if '.tif' not in cam.all_files and '.raw' in cam.all_files:
             extension = 'raw'
 
         image_packer = ImagePacker()
@@ -325,7 +333,7 @@ def download_original(request):
                 # Take was already exported, need to get image from exported location (if accessible)
                 json_data['folder'] = take.export_path
 
-            url = 'http://%s:8080/download/' % (node[0].ip_address)           
+            url = f'http://{node[0].ip_address}:8080/download/'
             try:
 
                 result = requests.post(url, data=json_data, timeout=DEFAULT_NODE_HTTP_TIMEOUT)
@@ -336,11 +344,16 @@ def download_original(request):
                 image_packer.add(basename, file_data, result.info().type)
 
             except Exception as e:
-                g_logger.error('post_toggle_using_sync %s: %s' % (cam.machine_name, e))  
-                return JSONResponse({'message':'Could not download file from %s' % cam.machine_name}, status=500)                  
+                g_logger.error(f'post_toggle_using_sync {cam.machine_name}: {e}')
+                return JSONResponse(
+                    {
+                        'message': f'Could not download file from {cam.machine_name}'
+                    },
+                    status=500,
+                )                  
 
         return image_packer.response()
-        
+
 
     # Camera not found in take
     return HttpResponse(status=404)
@@ -376,7 +389,7 @@ def post_import_session(request, project_id="0"):
         serializer.save()        
 
     except Exception as e:
-        return JSONResponse({'message':'Error: %s' % e}, status=500)
+        return JSONResponse({'message': f'Error: {e}'}, status=500)
 
     return HttpResponse()
 
@@ -398,7 +411,7 @@ def post_tracking_asset_thumbnail(request, asset_id="0", frame="0"):
         filename = 'track%d_f%d.jpg' % (asset_id, frame)
         filepath = full_thumb_path(filename)
 
-        g_logger.info('Writing %s' % filepath)    
+        g_logger.info(f'Writing {filepath}')    
 
         # Write file to disk
         try:
@@ -430,10 +443,10 @@ def post_scan_asset_thumbnail(request, asset_id="0", asset_type="front"):
             filename = 's%08d_f%d_%s.jpg' % (asset_id, int(asset_type), uuid_node_base36())
         else:
             filename = 's%08d_%s_%s.jpg' % (asset_id, asset_type, uuid_node_base36())
-        
+
         filepath = full_thumb_path(filename)
 
-        g_logger.info('Writing %s' % filepath)    
+        g_logger.info(f'Writing {filepath}')    
 
         # Write file to disk
         try:
@@ -553,10 +566,10 @@ def post_export_takes(request):
                 take_frame_count = take.frame_count()
 
                 # Set job priority according to take type
-                if take.flag=='calib':
-                    job_priority = 55
-                elif take.flag=='best':
+                if take.flag == 'best':
                     job_priority = 52
+                elif take.flag == 'calib':
+                    job_priority = 55
                 if take_frame_count==1:
                     job_priority = job_priority + 1
 
@@ -569,42 +582,44 @@ def post_export_takes(request):
                     for filepath in cam.all_files.split(';'):
                         files_to_export[cam.machine_name].append((filepath, take.export_path))
 
-                params = {}
-                params['root_export_path'] = export_path
-                params['export_path'] = take.export_path
-                params['nodes'] = files_to_export
+                params = {
+                    'root_export_path': export_path,
+                    'export_path': take.export_path,
+                    'nodes': files_to_export,
+                }
                 params_json = json.dumps(params)
 
                 # Create Job
                 job1 = FarmJob(job_class='jobs.archive.ExportTake', created_by=request.user.username, params=params_json, status='ready', ext_take=take, req_gpu=False, priority=job_priority)
                 job1.save()
 
-                if take.is_scan_burst:
-                    # If there is no scan asset associated with this Take, create it
-                    if not StaticScanAsset.objects.filter(take=take).exists():
-                        asset = StaticScanAsset(
-                            project=take.shot.session.project, 
-                            name=take.full_name(), 
-                            take=take,
-                            image_folder=take.export_path,
-                            has_tracking=False # because this asset was created with the Burst button
-                            )
-                        asset.save()
-                        asset.work_folder = os.path.join(take.export_path, 'work_SA%d' % asset.id)
-                        asset.save()
+                if (
+                    take.is_scan_burst
+                    and not StaticScanAsset.objects.filter(take=take).exists()
+                ):
+                    asset = StaticScanAsset(
+                        project=take.shot.session.project, 
+                        name=take.full_name(), 
+                        take=take,
+                        image_folder=take.export_path,
+                        has_tracking=False # because this asset was created with the Burst button
+                        )
+                    asset.save()
+                    asset.work_folder = os.path.join(take.export_path, 'work_SA%d' % asset.id)
+                    asset.save()
 
-                        # Create Job for GenerateThumbnails for the new static scan asset
-                        params = {}
-                        params['take_export_path'] = take.export_path
-                        params_json = json.dumps(params)
-                        job2 = FarmJob(job_class='jobs.thumbnails.GenerateThumbnail', created_by=request.user.username, params=params_json, status='created', ext_scan_assets=asset, req_gpu=False, priority=job_priority)
-                        job2.save()
-                        job2.dependencies.add(job1)
-                        job2.status='ready'
-                        job2.save()
+                    # Create Job for GenerateThumbnails for the new static scan asset
+                    params = {}
+                    params['take_export_path'] = take.export_path
+                    params_json = json.dumps(params)
+                    job2 = FarmJob(job_class='jobs.thumbnails.GenerateThumbnail', created_by=request.user.username, params=params_json, status='created', ext_scan_assets=asset, req_gpu=False, priority=job_priority)
+                    job2.save()
+                    job2.dependencies.add(job1)
+                    job2.status='ready'
+                    job2.save()
 
                 # Create Job for GenerateThumbnails
-                if not take_frame_count==1:
+                if take_frame_count != 1:
                     params = {}
                     params['take_export_path'] = take.export_path
                     params_json = json.dumps(params)

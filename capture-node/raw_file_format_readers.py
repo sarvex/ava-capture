@@ -57,7 +57,7 @@ def rotate_img(img, angle):
         return cv2.flip(cv2.flip(img,0),1)
     elif angle == 90:
         return cv2.flip(cv2.transpose(img),1)
-    elif angle == -90 or angle == 270:
+    elif angle in [-90, 270]:
         return cv2.transpose(cv2.flip(img,1))
     return img
 
@@ -91,7 +91,7 @@ def raw_processing_to_float32_linear(raw_img, bayer, blacklevel, bitcount, kB, k
         img = img << (16 - bitcount)
 
     # Convert image to Float32
-    if img.dtype == np.uint8 or img.dtype == np.uint16:
+    if img.dtype in [np.uint8, np.uint16]:
         img = img.astype(np.float32) / float(max_value)
     else:
         raise Exception('Unknown input image format')
@@ -153,11 +153,8 @@ def raw_processing_to_16bit_linear(raw_img, bayer, blacklevel, bitcount, kB, kG,
             img = np.clip(img >> 16,0,65535).astype(np.uint16)
         else:
             raise Exception('Invalid bit depth for raw image')
-    else:
-        # GRAYSCALE
-        # upgrade image to 16 bit
-        if np.uint8 == img.dtype:
-            img = img.astype(np.uint16) << 8
+    elif np.uint8 == img.dtype:
+        img = img.astype(np.uint16) << 8
 
     # Image is in Linear RGB, always 16 bit
     return img # img_uint16_linearRGB
@@ -249,17 +246,15 @@ class AvaSequenceFileReader():
         # Read one frame from .ava file
         frame_offset = self._get_frame_offset_skip(index)
         self._f.seek(frame_offset)
-        buf = self._f.read(self._compute_frame_size(index))
-
-        return buf
+        return self._f.read(self._compute_frame_size(index))
 
     def _read_one_frame_16bit_linear(self, frame_index, resize_max_side):
 
         if frame_index<0 or frame_index>=self._frame_count:
-            raise Exception('Invalid frame index %s' % frame_index)
+            raise Exception(f'Invalid frame index {frame_index}')
 
         if self._raise_error_on_missing_frame and not self._frame_indices[frame_index]:
-            raise Exception('Missing frame index %s' % frame_index)
+            raise Exception(f'Missing frame index {frame_index}')
 
         compressed_buffer = self._read_frame(frame_index)
 
@@ -305,7 +300,7 @@ class AvaRawImageFileReader():
                 raise Exception('Invalid Ava RAW file (magic)')
             if version != 1:
                 raise Exception('Invalid Ava RAW file (version)')
-            if channels != 1 and channels != 3:
+            if channels not in [1, 3]:
                 raise Exception('Invalid Ava RAW file (channels)')
 
             tif_data = buffer[:len(buffer)-raw_footer_size]

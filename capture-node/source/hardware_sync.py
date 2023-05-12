@@ -26,11 +26,8 @@ class ArduinoHardWareSync():
     @staticmethod
     def auto_detect_port():
         for i in range(10):
-            if sys.platform == 'win32':
-                comport = 'COM%d' % i
-            else:
-                comport = '/dev/ttyACM%d' % i
-            test = ArduinoHardWareSync(comport) 
+            comport = 'COM%d' % i if sys.platform == 'win32' else '/dev/ttyACM%d' % i
+            test = ArduinoHardWareSync(comport)
             if test.ok:
                 return comport
 
@@ -47,8 +44,7 @@ class ArduinoHardWareSync():
             wait_ms = (time.time() - start_time) * 1000.0
             if wait_ms > timeout_ms:
                 raise Exception('Timeout reading serial')
-        ret = self.ser.read(nb_char)
-        return ret
+        return self.ser.read(nb_char)
 
     def current_framerate(self):
         if self.ok:
